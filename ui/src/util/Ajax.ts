@@ -139,8 +139,13 @@ export default class Ajax {
     // Acquire mutex so that refreshing the token is not refreshed concurrently
     return Ajax.REFRESH_TOKEN_MUTEX.acquire().then((release) => {
       return new Promise<void>(function (resolve, reject) {
-        // Once it's our turn, check if we really need to refresh the token
         const credentials = Ajax.PERSISTER.readCredentialsFromSessionStorage();
+        //Do not issue a refresh if there is no access token, but refresh, if an expired one exists. This acts as a guard against the case where the refresh token is valid but the access token has been deleted from session storage (e.g. by a user clearing their session storage or closing the browser tab). In this case, we don't want a new access token being issued and stored in session storage, because this would be a security risk if the user intended to log out and forgot to do so.
+        if (!credentials.accessToken) {
+          resolve();
+          return;
+        }
+        // Once it's our turn, check if we really need to refresh the token
         if (
           !force &&
           new Date().getTime() < credentials.accessTokenExpiry.getTime()
